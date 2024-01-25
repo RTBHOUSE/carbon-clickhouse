@@ -223,14 +223,23 @@ func (u *Base) compress(data *io.PipeReader, filename string) io.Reader {
 	go func() {
 		_, err := io.Copy(gw, data)
 		if err != nil {
-			data.CloseWithError(err)
 			pw.CloseWithError(err)
-		} else {
-			data.Close()
-			gw.Close()
-			pw.Close()
+			data.CloseWithError(err)
+			logger.With(zap.Error(err)).Debug("Compress finished, error in io.Copy")
+			return
 		}
-		logger.With(zap.Error(err)).Debug("Compress finished")
+
+		err = gw.Close()
+		if err != nil {
+			pw.CloseWithError(err)
+			data.CloseWithError(err)
+			logger.With(zap.Error(err)).Debug("Compress finished, error in gw.Close")
+			return
+		}
+
+		pw.Close()
+		data.Close()
+		logger.Debug("Compress finished")
 	}()
 
 	return pr
